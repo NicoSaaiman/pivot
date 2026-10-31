@@ -20,7 +20,35 @@ Rust,
 ...
 
 ## Getting Started
-TODO
+
+Controller and Agent(s) should run in different terminal windows.
+Ensure that Docker Desktop is running.
+
+1) Start Controller:
+
+```bash
+cargo run -p pivot-controller
+```
+
+Note: Controller uses port 3000 by default
+
+2) Start Agent(s):
+
+```bash
+cargo run -p pivot-agent <node_name> <port>
+```
+
+3) Send desired workload:
+
+3.1) Process:
+```cmd
+curl -X POST localhost:3000/execute -H "Content-Type: application/json" -d "{\"id\":\"test\",\"group_id\":\"default\",\"desired_state\":\"Exited\",\"execution_type\":{\"Process\":{\"command\":\"sleep\",\"args\":[\"30\"]}}}"
+```
+
+3.2) Docker:
+```cmd
+curl -X POST http://localhost:3000/execute -H "Content-Type: application/json" -d "{\"id\":\"workload-1\",\"group_id\":\"group-1\",\"desired_state\":\"Running\",\"execution_type\":{\"DockerContainer\":{\"name\":\"pivot-nginx\",\"image\":\"nginx\",\"cmd\":null}}}"
+```
 
 ## Project Structure
 pivot/
