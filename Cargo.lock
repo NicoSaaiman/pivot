@@ -900,8 +900,8 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "bollard",
- "cc",
  "reqwest",
+ "runtime",
  "serde",
  "shared",
  "thiserror",
@@ -1104,6 +1104,15 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "runtime"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "shared",
+ "thiserror",
 ]
 
 [[package]]

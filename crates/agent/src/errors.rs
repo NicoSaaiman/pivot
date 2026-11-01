@@ -23,13 +23,13 @@ pub enum AgentError {
     #[error("Missing uptime field")]
     MissingUptimeField,
     #[error("Invalid C string: {0}")]
-    NulError(#[from] std::ffi::NulError),
-    #[error("Failed to parse value")]
     ParseFloat(#[from] std::num::ParseFloatError),
     #[error("Agent state lock was poisoned")]
     PoisonError,
     #[error("Http request failed")]
     ReqwestError(#[from] reqwest::Error),
+    #[error("Runtime error: {0}")]
+    RuntimeError(#[from] runtime::errors::RuntimeError),
     #[error("Unknown execution state")]
     UnknownExecutionState,
     #[error("Unknown execution status")]

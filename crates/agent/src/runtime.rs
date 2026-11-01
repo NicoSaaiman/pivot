@@ -8,6 +8,8 @@ use bollard::query_parameters::CreateContainerOptionsBuilder;
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::RemoveContainerOptionsBuilder;
 
+use runtime::ffi;
+
 use shared::models::{
     ExecutionState,
     ExecutionType,
@@ -15,7 +17,6 @@ use shared::models::{
 };
 
 use crate::{
-    custom_container_ffi,
     errors::{AgentError, Result},
     state::{AgentState, RuntimeHandle},
 };
@@ -77,7 +78,7 @@ impl RuntimeManager {
                     .insert(workload.get_workload_id(), RuntimeHandle::Docker { container_id });
             },
             ExecutionType::CustomContainer(custom_container) => {
-                custom_container_ffi::print_process_details(&custom_container.process)?;
+                ffi::print_process_details(&custom_container.process)?;
             },
         }
 

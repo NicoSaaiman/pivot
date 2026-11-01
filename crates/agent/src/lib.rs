@@ -6,4 +6,3 @@ pub mod metrics;
 pub mod routes;
 pub mod runtime;
 pub mod state;
-pub mod custom_container_ffi;

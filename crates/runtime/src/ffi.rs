@@ -1,8 +1,8 @@
 use std::ffi::{c_char, CString};
 
-use crate::errors::Result;
-
 use shared::models::Process;
+
+use crate::errors::Result;
 
 unsafe extern "C" {
     fn ffi_print_process_details(

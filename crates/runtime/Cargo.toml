@@ -1,0 +1,16 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "runtime"
+path = "src/lib.rs"
+
+[dependencies]
+shared = { path = "../shared" }
+
+thiserror = "2.0"
+
+[build-dependencies]
+cc = "1"
