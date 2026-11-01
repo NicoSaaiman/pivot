@@ -22,6 +22,8 @@ pub enum AgentError {
     MissingMemoryField,
     #[error("Missing uptime field")]
     MissingUptimeField,
+    #[error("Invalid C string: {0}")]
+    NulError(#[from] std::ffi::NulError),
     #[error("Failed to parse value")]
     ParseFloat(#[from] std::num::ParseFloatError),
     #[error("Agent state lock was poisoned")]

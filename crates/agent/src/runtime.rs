@@ -15,6 +15,7 @@ use shared::models::{
 };
 
 use crate::{
+    custom_container_ffi,
     errors::{AgentError, Result},
     state::{AgentState, RuntimeHandle},
 };
@@ -75,7 +76,9 @@ impl RuntimeManager {
                     .workloads
                     .insert(workload.get_workload_id(), RuntimeHandle::Docker { container_id });
             },
-            ExecutionType::CustomContainer(_) => todo!(),
+            ExecutionType::CustomContainer(custom_container) => {
+                custom_container_ffi::print_process_details(&custom_container.process)?;
+            },
         }
 
         Ok(())

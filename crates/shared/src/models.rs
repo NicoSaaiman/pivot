@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::time::{Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
@@ -136,7 +137,7 @@ pub enum ExecutionType {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CustomContainer {
-    image: String,
+    pub process: Process,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -150,14 +151,24 @@ pub struct DockerContainer {
 pub struct Process {
     command: String,
     args: Vec<String>,
+    env: BTreeMap<String, String>,
+    working_directory: Option<String>,
 }
 
 impl Process {
-    pub fn get_command(&self) -> String {
-        self.command.clone()
+    pub fn get_command(&self) -> &str {
+        &self.command
     }
 
-    pub fn get_args(&self) -> Vec<String> {
-        self.args.clone()
+    pub fn get_args(&self) -> &[String] {
+        &self.args
+    }
+
+    pub fn get_env(&self) -> &BTreeMap<String, String> {
+        &self.env
+    }
+
+    pub fn get_working_dir(&self) -> Option<&str> {
+        self.working_directory.as_deref()
     }
 }

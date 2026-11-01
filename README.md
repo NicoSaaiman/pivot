@@ -50,6 +50,11 @@ curl -X POST localhost:3000/execute -H "Content-Type: application/json" -d "{\"i
 curl -X POST http://localhost:3000/execute -H "Content-Type: application/json" -d "{\"id\":\"workload-1\",\"group_id\":\"group-1\",\"desired_state\":\"Running\",\"execution_type\":{\"DockerContainer\":{\"name\":\"pivot-nginx\",\"image\":\"nginx\",\"cmd\":null}}}"
 ```
 
+3.3) Custom:
+```cmd
+curl -X POST localhost:3000/execute -H "Content-Type: application/json" -d "{\"id\":\"test\",\"group_id\":\"default\",\"desired_state\":\"Exited\",\"execution_type\":{\"CustomContainer\":{\"process\":{\"command\":\"echo\",\"args\":[\"Hello from C\"],\"env\":{\"RUST_LOG\":\"info\",\"TEST_VAR\":\"hello\"},\"working_dir\":\"/tmp\"}}}}"
+```
+
 ## Project Structure
 pivot/
     design/
