@@ -16,6 +16,7 @@ int get_process_state(pid_t pid) {
 	}
 
 	if (result == -1) {
+		perror("waitpid");
 		return PROCESS_ERROR;
 	}
 

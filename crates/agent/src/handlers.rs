@@ -20,7 +20,6 @@ use shared::models::{
     ExecutionState, 
     Workload, 
     WorkloadId,
-    WorkloadInfo,
     WorkloadStatus,
     WorkloadToDelete,
 };
@@ -43,12 +42,12 @@ pub async fn get_workload(
     Path(workload_id): Path<WorkloadId>,
 ) -> Result<impl IntoResponse> {
     let workload_info = {
-        let mut state = state
+        let mut agent_state = state
             .agent
             .write()
             .map_err(|_| AgentError::PoisonError)?;
 
-        let workload = state
+        let workload = agent_state
             .workloads
             .get_mut(&workload_id)
             .ok_or_else(|| AgentError::WorkloadNotFound(workload_id.clone()))?;
@@ -61,24 +60,25 @@ pub async fn get_workload(
                     Err(_) => ExecutionState::Unknown,
                 };
                 
-                WorkloadInfo::Process(execution_state)
+                WorkloadStateSource::Resolved(execution_state)
             }
             RuntimeHandle::Docker { container_id } => {
-                WorkloadInfo::Docker(container_id.clone())
+                WorkloadStateSource::Docker(container_id.clone())
             }
-            RuntimeHandle::Custom { pid } => {
-                WorkloadInfo::Custom(*pid)
+            RuntimeHandle::Custom { pid, cached_state } => {
+                if *cached_state == ExecutionState::Running {
+                    *cached_state = state.runtime.custom_get_state(*pid)?;
+                }
+
+                WorkloadStateSource::Resolved(cached_state.clone())
             }
         }
     };
 
     let execution_state = match workload_info {
-        WorkloadInfo::Process(execution_state) => execution_state,
-        WorkloadInfo::Docker(container_id) => {
+        WorkloadStateSource::Resolved(execution_state) => execution_state,
+        WorkloadStateSource::Docker(container_id) => {
             state.runtime.docker_get_state(&container_id).await?       
-        }
-        WorkloadInfo::Custom(pid) => {
-            state.runtime.custom_get_state(pid)?        
         }
     };
 
@@ -129,24 +129,25 @@ pub async fn get_workloads(
                         Err(_) => ExecutionState::Unknown,
                     };
                     
-                    WorkloadInfo::Process(execution_state)
+                    WorkloadStateSource::Resolved(execution_state)
                 }
                 RuntimeHandle::Docker { container_id } => {
-                    WorkloadInfo::Docker(container_id.clone())
+                    WorkloadStateSource::Docker(container_id.clone())
                 }
-                RuntimeHandle::Custom { pid } => {
-                    WorkloadInfo::Custom(*pid)
+                 RuntimeHandle::Custom { pid, cached_state } => {
+                    if *cached_state == ExecutionState::Running {
+                        *cached_state = state.runtime.custom_get_state(*pid)?;
+                    }
+
+                    WorkloadStateSource::Resolved(cached_state.clone())
                 }
             }
         };
 
         let execution_state = match workload_info {
-            WorkloadInfo::Process(execution_state) => execution_state,
-            WorkloadInfo::Docker(container_id) => {
+            WorkloadStateSource::Resolved(execution_state) => execution_state,
+            WorkloadStateSource::Docker(container_id) => {
                 state.runtime.docker_get_state(&container_id).await?       
-            }
-            WorkloadInfo::Custom(pid) => {
-                state.runtime.custom_get_state(pid)?
             }
         };
 
@@ -178,7 +179,7 @@ pub async fn delete_workload(
             RuntimeHandle::Docker { container_id } => {
                 WorkloadToDelete::Docker(container_id.clone())
             }
-            RuntimeHandle::Custom { pid } => {
+            RuntimeHandle::Custom { pid, cached_state } => {
                 WorkloadToDelete::Custom(*pid)
             }
         }
@@ -231,7 +232,7 @@ pub async fn delete_workload(
 
             //agent_state.workloads.remove(&workload_id);
 
-            Ok(Json("Custom container deleted"))
+            Ok(Json("Custom container termination requested"))
         }
     }
 }
@@ -246,4 +247,9 @@ pub async fn get_node_metrics() -> Result<impl IntoResponse> {
     let metrics = metrics::get_node_metrics()?;
 
     Ok(Json(metrics))
+}
+
+enum WorkloadStateSource {
+    Resolved(ExecutionState),
+    Docker(String),
 }

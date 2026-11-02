@@ -89,7 +89,7 @@ impl RuntimeManager {
 
                 state
                     .workloads
-                    .insert(workload.get_workload_id(), RuntimeHandle::Custom { pid });
+                    .insert(workload.get_workload_id(), RuntimeHandle::Custom { pid, cached_state: ExecutionState::Running });
             },
         }
 

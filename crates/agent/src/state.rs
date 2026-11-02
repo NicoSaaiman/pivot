@@ -3,7 +3,7 @@ use std::ffi::c_int;
 use std::process::Child;
 use std::sync::{Arc, RwLock};
 
-use shared::models::WorkloadId;
+use shared::models::{ExecutionState, WorkloadId};
 
 use crate::{
     controller_client::HttpControllerClient,
@@ -47,5 +47,6 @@ pub enum RuntimeHandle {
     },
     Custom {
         pid: c_int,
+        cached_state: ExecutionState,
     },
 }
