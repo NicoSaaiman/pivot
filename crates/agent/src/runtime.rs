@@ -78,7 +78,8 @@ impl RuntimeManager {
                     .insert(workload.get_workload_id(), RuntimeHandle::Docker { container_id });
             },
             ExecutionType::CustomContainer(custom_container) => {
-                ffi::print_process_details(&custom_container.process)?;
+                let pid = ffi::create_process(&custom_container.process)?;
+                println!("PID: {pid}");
             },
         }
 
