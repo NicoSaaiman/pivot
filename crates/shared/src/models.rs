@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ffi::c_int;
 use std::time::{Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
@@ -40,11 +41,13 @@ pub struct WorkloadStatus {
 pub enum WorkloadInfo {
     Process(ExecutionState),
     Docker(String),
+    Custom(c_int),
 }
 
 pub enum WorkloadToDelete {
     Process,
     Docker(String),
+    Custom(c_int),
 }
 
 //--------------Nodes----------------

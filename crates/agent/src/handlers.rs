@@ -65,8 +65,10 @@ pub async fn get_workload(
             }
             RuntimeHandle::Docker { container_id } => {
                 WorkloadInfo::Docker(container_id.clone())
-            },
-            RuntimeHandle::Custom => todo!(),
+            }
+            RuntimeHandle::Custom { pid } => {
+                WorkloadInfo::Custom(*pid)
+            }
         }
     };
 
@@ -74,6 +76,9 @@ pub async fn get_workload(
         WorkloadInfo::Process(execution_state) => execution_state,
         WorkloadInfo::Docker(container_id) => {
             state.runtime.docker_get_state(&container_id).await?       
+        }
+        WorkloadInfo::Custom(pid) => {
+            state.runtime.custom_get_state(pid)?        
         }
     };
 
@@ -128,8 +133,10 @@ pub async fn get_workloads(
                 }
                 RuntimeHandle::Docker { container_id } => {
                     WorkloadInfo::Docker(container_id.clone())
-                },
-                RuntimeHandle::Custom => todo!(),
+                }
+                RuntimeHandle::Custom { pid } => {
+                    WorkloadInfo::Custom(*pid)
+                }
             }
         };
 
@@ -137,6 +144,9 @@ pub async fn get_workloads(
             WorkloadInfo::Process(execution_state) => execution_state,
             WorkloadInfo::Docker(container_id) => {
                 state.runtime.docker_get_state(&container_id).await?       
+            }
+            WorkloadInfo::Custom(pid) => {
+                state.runtime.custom_get_state(pid)?
             }
         };
 
@@ -164,11 +174,13 @@ pub async fn delete_workload(
         match runtime_handle {
             RuntimeHandle::Process(_) => {
                 WorkloadToDelete::Process
-            },
+            }
             RuntimeHandle::Docker { container_id } => {
                 WorkloadToDelete::Docker(container_id.clone())
-            },
-            RuntimeHandle::Custom => todo!(),
+            }
+            RuntimeHandle::Custom { pid } => {
+                WorkloadToDelete::Custom(*pid)
+            }
         }
     };
 
@@ -206,6 +218,20 @@ pub async fn delete_workload(
             agent_state.workloads.remove(&workload_id);
 
             Ok(Json("Docker workload deleted"))
+        }
+        WorkloadToDelete::Custom(pid) => {
+            state
+                .runtime
+                .custom_terminate_process(pid)?;
+
+            //let mut agent_state = state
+            //    .agent
+            //    .write()
+            //    .map_err(|_| AgentError::PoisonError)?;
+
+            //agent_state.workloads.remove(&workload_id);
+
+            Ok(Json("Custom container deleted"))
         }
     }
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::c_int;
 use std::process::Child;
 use std::sync::{Arc, RwLock};
 
@@ -44,5 +45,7 @@ pub enum RuntimeHandle {
     Docker {
         container_id: String,
     },
-    Custom,
+    Custom {
+        pid: c_int,
+    },
 }

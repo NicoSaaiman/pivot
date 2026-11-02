@@ -1,10 +1,34 @@
 #include "monitoring.h"
+#include "process_state.h"
 
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <sys/wait.h>
+
+int get_process_state(pid_t pid) {
+	int status;
+	pid_t result = waitpid(pid, &status, WNOHANG);
+
+	if (result == 0) {
+		return PROCESS_RUNNING;
+	}
+
+	if (result == -1) {
+		return PROCESS_ERROR;
+	}
+
+	if (result == pid) {
+		if (WIFEXITED(status)) {
+			return PROCESS_EXITED;
+		} else if (WIFSIGNALED(status)) {
+			return PROCESS_SIGNALED;
+		}
+	}
+
+	return PROCESS_ERROR;
+}
 
 int monitor_processes(int num_to_create, int created_total, pid_t *child_pids) {
 	int failed = 0;

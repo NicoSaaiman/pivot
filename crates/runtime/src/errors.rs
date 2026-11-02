@@ -8,4 +8,8 @@ pub enum RuntimeError {
     ForkFailed,
     #[error("Invalid C string: {0}")]
     NulError(#[from] std::ffi::NulError),
+    #[error("Failed to retrieve process state")]
+    ProcessStateFailed,
+    #[error("Failed to terminate process")]
+    TerminationFailed,
 }

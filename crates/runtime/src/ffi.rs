@@ -1,6 +1,6 @@
 use std::ffi::{c_char, c_int, CString};
 
-use shared::models::Process;
+use shared::models::{ExecutionState, Process};
 
 use crate::errors::{Result, RuntimeError};
 
@@ -98,6 +98,8 @@ struct CProcess {
 unsafe extern "C" {
     fn ffi_print_process_details(process: *const CProcess);
     fn ffi_create_process(process: *const CProcess) -> c_int;
+    fn ffi_get_process_state(pid: c_int) -> c_int;
+    fn ffi_terminate_process(pid: c_int) -> c_int;
 }
 
 pub fn print_process_details(process: &Process) -> Result<()> {
@@ -124,4 +126,31 @@ pub fn create_process(process: &Process) -> Result<c_int> {
     }
 
     Ok(pid)
+}
+
+pub fn get_process_state(pid: c_int) -> Result<ExecutionState> {
+    let state = unsafe {
+        ffi_get_process_state(pid)
+    };
+
+    let state = match state {
+        0 => ExecutionState::Running,
+        1 | 2 => ExecutionState::Exited,
+        -1 => return Err(RuntimeError::ProcessStateFailed),
+        _ => ExecutionState::Unknown,
+    };
+
+    Ok(state)
+}
+
+pub fn terminate_process(pid: c_int) -> Result<()> {
+    let result = unsafe {
+        ffi_terminate_process(pid)
+    };
+
+    if result == -1 {
+        return Err(RuntimeError::TerminationFailed);
+    }
+
+    Ok(())
 }

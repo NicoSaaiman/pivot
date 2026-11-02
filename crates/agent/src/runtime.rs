@@ -1,3 +1,4 @@
+use std::ffi::c_int;
 use std::process::Command;
 use std::sync::{Arc, RwLock};
 
@@ -80,6 +81,15 @@ impl RuntimeManager {
             ExecutionType::CustomContainer(custom_container) => {
                 let pid = ffi::create_process(&custom_container.process)?;
                 println!("PID: {pid}");
+
+                let mut state = self
+                    .state
+                    .write()
+                    .map_err(|_| AgentError::PoisonError)?;
+
+                state
+                    .workloads
+                    .insert(workload.get_workload_id(), RuntimeHandle::Custom { pid });
             },
         }
 
@@ -153,4 +163,15 @@ impl RuntimeManager {
 
         Ok(())
     }
+
+    pub fn custom_get_state(&self, pid: c_int) -> Result<ExecutionState> {
+        let state = ffi::get_process_state(pid)?;
+        Ok(state)
+    }
+
+    pub fn custom_terminate_process(&self, pid: c_int) -> Result<()> {
+        ffi::terminate_process(pid)?;
+        Ok(())
+    }
+
 }
