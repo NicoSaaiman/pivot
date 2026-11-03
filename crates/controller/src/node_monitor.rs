@@ -29,7 +29,7 @@ pub async fn poll_nodes(state: Arc<RwLock<ControllerState>>) -> Result<()> {
             let response = match client.get(&url).send().await {
                 Ok(response) => response,
                 Err(error) => {
-                    println!("Failed to contact node {node_id}: {error}");
+                    tracing::error!("Failed to contact node {node_id}: {error}");
                     continue;
                 }
             };
@@ -37,7 +37,7 @@ pub async fn poll_nodes(state: Arc<RwLock<ControllerState>>) -> Result<()> {
             let response = match response.error_for_status() {
                 Ok(response) => response,
                 Err(error) => {
-                    println!("Node {node_id} returned an error: {error}");
+                    tracing::error!("Node {node_id} returned an error: {error}");
                     continue;
                 }
             };
@@ -45,7 +45,7 @@ pub async fn poll_nodes(state: Arc<RwLock<ControllerState>>) -> Result<()> {
             let workloads: HashMap<WorkloadId, ExecutionState> = match response.json().await {
                 Ok(workloads) => workloads,
                 Err(error) => {
-                    println!("Failed to read workloads from {node_id}: {error}");
+                    tracing::error!("Failed to read workloads from {node_id}: {error}");
                     continue;
                 }
             };

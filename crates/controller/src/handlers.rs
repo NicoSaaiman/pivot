@@ -69,9 +69,11 @@ pub async fn delete_workload(
     };
 
     client
-        .delete_workload(&node.get_address(), workload_id)
+        .delete_workload(&node.get_address(), workload_id.clone())
         .await?;
-    
+   
+    tracing::info!("Workload deleted: {workload_id} -> {}", node.id);
+
     Ok(Json("Workload deleted"))
 }
 

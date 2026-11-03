@@ -80,7 +80,6 @@ impl RuntimeManager {
             },
             ExecutionType::CustomContainer(custom_container) => {
                 let pid = ffi::create_process(&custom_container.process)?;
-                println!("PID: {pid}");
 
                 let mut state = self
                     .state
