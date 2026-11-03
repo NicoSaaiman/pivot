@@ -1,5 +1,8 @@
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+
+use tokio::time;
 
 use crate::{
     errors::{ControllerError, Result},
@@ -8,40 +11,54 @@ use crate::{
 
 use shared::models::ExecutionState;
 
+const WORKLOAD_GRACE_PERIOD: Duration = Duration::from_secs(15);
+
 pub async fn reconcile_workloads(state: Arc<RwLock<ControllerState>>) -> Result<()> {
+    let mut converged_workloads = HashSet::new();
+    let mut missing_workloads = HashSet::new();
+
     loop {
         {
             let state = state
                 .read()
                 .map_err(|_| ControllerError::PoisonError)?;
 
-            println!("Desired workloads: {}", state.desired_workloads.len());
-            println!("Actual workloads: {}", state.actual_workloads.len());
-
             for (workload_id, desired_workload) in state.desired_workloads.iter() {
                 let desired_state = desired_workload.workload.get_desired_state();
                 if let Some(actual_workload) = state.actual_workloads.get(workload_id) {
+                    missing_workloads.remove(workload_id);
+
                     let actual_state = actual_workload.status.get_state();
 
                     if desired_state == actual_state {
-                        println!("No issues found with {workload_id}");
+                        if converged_workloads.insert(workload_id.clone()) {
+                            tracing::info!("Workload reached desired state: {workload_id}");
+                        }
                         continue;
                     }
 
+                    converged_workloads.remove(workload_id);
+
                     match (desired_state, actual_state) {
                         (ExecutionState::Running, ExecutionState::Exited | ExecutionState::Stopped) => {
-                            println!("Restarting workload {workload_id}");
+                            tracing::warn!("Restarting workload {workload_id}");
                         }
                         (ExecutionState::Running, ExecutionState::Unknown) => {
-                            println!("Could not determine actual state for {workload_id}");
+                            tracing::error!("Could not determine actual state for {workload_id}");
                         }
                         (_, _) => {}
                     }
                 } else {
-                    println!("Workload is missing from actual state!");
+                    converged_workloads.remove(workload_id);
+
+                    if desired_workload.scheduled_at.elapsed() > WORKLOAD_GRACE_PERIOD {
+                        if missing_workloads.insert(workload_id.clone()) {
+                            tracing::warn!("Workload missing from actual state: {workload_id}");
+                        }
+                    }
                 }
             }
         }
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
     }
 }

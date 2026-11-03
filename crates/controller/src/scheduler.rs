@@ -1,3 +1,4 @@
+use std::time::Instant;
 use std::sync::{Arc, RwLock};
 
 use shared::models::{
@@ -50,6 +51,10 @@ impl ScheduleManager {
         )
     }
 
+    pub fn get_node(&self) -> &Node {
+        &self.node
+    }
+
     pub async fn schedule_workload(&self) -> Result<()> {
         self.record_desired_state()?;
 
@@ -94,6 +99,7 @@ impl ScheduleManager {
             ScheduledWorkload {
                 workload: self.workload.clone(),
                 assigned_node: Some(self.node.id.clone()),
+                scheduled_at: Instant::now(),
             },
         );
 

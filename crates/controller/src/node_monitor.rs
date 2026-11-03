@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
+use tokio::time;
+
 use shared::models::{ExecutionState, WorkloadId};
 
 use crate::{
@@ -86,6 +88,6 @@ pub async fn poll_nodes(state: Arc<RwLock<ControllerState>>) -> Result<()> {
             }
         }
 
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        time::sleep(Duration::from_secs(5)).await;
     }
 }

@@ -101,6 +101,7 @@ impl ControllerState {
 pub struct ScheduledWorkload {
     pub workload: Workload,
     pub assigned_node: Option<NodeId>,
+    pub scheduled_at: Instant,
 }
 
 pub struct ActualWorkload {
