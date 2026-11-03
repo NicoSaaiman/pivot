@@ -19,7 +19,7 @@ use shared::models::{
 
 use crate::{
     errors::{AgentError, Result},
-    state::{AgentState, RuntimeHandle},
+    state::{AgentState, CustomProcessHandle, RuntimeHandle},
 };
 
 pub struct RuntimeManager {
@@ -79,7 +79,29 @@ impl RuntimeManager {
                     .insert(workload.get_workload_id(), RuntimeHandle::Docker { container_id });
             },
             ExecutionType::CustomContainer(custom_container) => {
-                let pid = ffi::create_process(&custom_container.process)?;
+                if custom_container.processes.is_empty() {
+                    return Err(AgentError::EmptyProcessCollection);
+                }
+
+                let mut processes: Vec<CustomProcessHandle> = Vec::with_capacity(custom_container.processes.len());
+
+                for process in &custom_container.processes {
+                    let pid = match ffi::create_process(process) {
+                        Ok(pid) => pid,
+                        Err(error) => {
+                            for process in &processes {
+                                ffi::terminate_process(process.pid)?;
+                            }
+
+                            return Err(error.into());
+                        }
+                    };
+
+                    processes.push(CustomProcessHandle {
+                        pid,
+                        cached_state: ExecutionState::Running,
+                    });
+                }
 
                 let mut state = self
                     .state
@@ -88,7 +110,8 @@ impl RuntimeManager {
 
                 state
                     .workloads
-                    .insert(workload.get_workload_id(), RuntimeHandle::Custom { pid, cached_state: ExecutionState::Running });
+                    .insert(workload.get_workload_id(), RuntimeHandle::Custom { processes });
+
             },
         }
 

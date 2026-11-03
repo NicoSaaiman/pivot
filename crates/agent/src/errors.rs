@@ -12,6 +12,8 @@ pub enum AgentError {
     BollardError(#[from] bollard::errors::Error),
     #[error("Docker not available")]
     DockerNotAvailable,
+    #[error("Empty collection of processes provided")]
+    EmptyProcessCollection,
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
     #[error("Missing CPU field")]

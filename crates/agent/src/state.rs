@@ -46,7 +46,11 @@ pub enum RuntimeHandle {
         container_id: String,
     },
     Custom {
-        pid: c_int,
-        cached_state: ExecutionState,
+        processes: Vec<CustomProcessHandle>,
     },
+}
+
+pub struct CustomProcessHandle {
+    pub pid: c_int,
+    pub cached_state: ExecutionState,
 }

@@ -65,12 +65,18 @@ pub async fn get_workload(
             RuntimeHandle::Docker { container_id } => {
                 WorkloadStateSource::Docker(container_id.clone())
             }
-            RuntimeHandle::Custom { pid, cached_state } => {
-                if *cached_state == ExecutionState::Running {
-                    *cached_state = state.runtime.custom_get_state(*pid)?;
-                }
+            RuntimeHandle::Custom { processes } => {
+                let mut process_states = Vec::with_capacity(processes.len());
 
-                WorkloadStateSource::Resolved(cached_state.clone())
+                for process in processes {
+                    if process.cached_state == ExecutionState::Running {
+                        process.cached_state = state.runtime.custom_get_state(process.pid)?;
+                    }
+                    
+                    process_states.push(process.cached_state.clone());
+                }
+                
+                WorkloadStateSource::Resolved(aggregate_process_states(&process_states))
             }
         }
     };
@@ -134,12 +140,18 @@ pub async fn get_workloads(
                 RuntimeHandle::Docker { container_id } => {
                     WorkloadStateSource::Docker(container_id.clone())
                 }
-                 RuntimeHandle::Custom { pid, cached_state } => {
-                    if *cached_state == ExecutionState::Running {
-                        *cached_state = state.runtime.custom_get_state(*pid)?;
-                    }
+                 RuntimeHandle::Custom { processes } => {
+                    let mut process_states = Vec::with_capacity(processes.len());
 
-                    WorkloadStateSource::Resolved(cached_state.clone())
+                    for process in processes {
+                        if process.cached_state == ExecutionState::Running {
+                            process.cached_state = state.runtime.custom_get_state(process.pid)?;
+                        }
+                    
+                        process_states.push(process.cached_state.clone());
+                    }
+                
+                    WorkloadStateSource::Resolved(aggregate_process_states(&process_states))
                 }
             }
         };
@@ -179,8 +191,10 @@ pub async fn delete_workload(
             RuntimeHandle::Docker { container_id } => {
                 WorkloadToDelete::Docker(container_id.clone())
             }
-            RuntimeHandle::Custom { pid, cached_state } => {
-                WorkloadToDelete::Custom(*pid)
+            RuntimeHandle::Custom { processes } => {
+                WorkloadToDelete::Custom(
+                    processes.iter().map(|process| process.pid).collect()
+                )
             }
         }
     };
@@ -220,17 +234,10 @@ pub async fn delete_workload(
 
             Ok(Json("Docker workload deleted"))
         }
-        WorkloadToDelete::Custom(pid) => {
-            state
-                .runtime
-                .custom_terminate_process(pid)?;
-
-            //let mut agent_state = state
-            //    .agent
-            //    .write()
-            //    .map_err(|_| AgentError::PoisonError)?;
-
-            //agent_state.workloads.remove(&workload_id);
+        WorkloadToDelete::Custom(pids) => {
+            for pid in pids { // todo (handle unhappy cases)
+                state.runtime.custom_terminate_process(pid)?;
+            }
 
             Ok(Json("Custom container termination requested"))
         }
@@ -247,6 +254,26 @@ pub async fn get_node_metrics() -> Result<impl IntoResponse> {
     let metrics = metrics::get_node_metrics()?;
 
     Ok(Json(metrics))
+}
+
+fn aggregate_process_states(states: &[ExecutionState]) -> ExecutionState {
+    if states.iter().all(|s| *s == ExecutionState::Running) {
+        return ExecutionState::Running;
+    }
+
+    if states.contains(&ExecutionState::Exited) {
+        return ExecutionState::Exited;
+    }
+
+    if states.contains(&ExecutionState::Unknown) {
+        return ExecutionState::Unknown;
+    }
+
+    if states.iter().all(|s| *s == ExecutionState::Stopped) {
+        return ExecutionState::Stopped;
+    }
+
+    ExecutionState::Unknown
 }
 
 enum WorkloadStateSource {

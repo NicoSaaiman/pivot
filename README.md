@@ -52,7 +52,7 @@ curl -X POST http://localhost:3000/execute -H "Content-Type: application/json" -
 
 3.3) Custom:
 ```cmd
-curl -X POST localhost:3000/execute -H "Content-Type: application/json" -d "{\"id\":\"test\",\"group_id\":\"default\",\"desired_state\":\"Exited\",\"execution_type\":{\"CustomContainer\":{\"process\":{\"command\":\"echo\",\"args\":[\"Hello from C\"],\"env\":{\"RUST_LOG\":\"info\",\"TEST_VAR\":\"hello\"},\"working_dir\":\"/tmp\"}}}}"
+curl.exe -X POST http://localhost:3000/execute -H "Content-Type: application/json" -d "{\"id\":\"multi-test\",\"group_id\":\"default\",\"desired_state\":\"Exited\",\"execution_type\":{\"CustomContainer\":{\"processes\":[{\"command\":\"/bin/sleep\",\"args\":[\"30\"],\"env\":{},\"working_dir\":null},{\"command\":\"/bin/sleep\",\"args\":[\"60\"],\"env\":{},\"working_dir\":null}]}}}"
 ```
 
 ## Project Structure

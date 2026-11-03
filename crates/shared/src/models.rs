@@ -47,7 +47,7 @@ pub enum WorkloadInfo {
 pub enum WorkloadToDelete {
     Process,
     Docker(String),
-    Custom(c_int),
+    Custom(Vec<c_int>),
 }
 
 //--------------Nodes----------------
@@ -140,7 +140,7 @@ pub enum ExecutionType {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CustomContainer {
-    pub process: Process,
+    pub processes: Vec<Process>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
