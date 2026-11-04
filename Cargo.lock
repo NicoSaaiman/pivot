@@ -936,6 +936,7 @@ dependencies = [
  "reqwest",
  "runtime",
  "serde",
+ "serde_json",
  "shared",
  "thiserror",
  "tokio",

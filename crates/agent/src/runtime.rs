@@ -1,6 +1,6 @@
 use std::ffi::c_int;
 use std::process::Command;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use bollard::Docker;
 use bollard::models::ContainerStateStatusEnum;
@@ -24,19 +24,24 @@ use crate::{
 
 pub struct RuntimeManager {
     state: Arc<RwLock<AgentState>>,
-    docker: Docker,
+    docker: OnceLock<Docker>,
 }
 
 impl RuntimeManager {
-    pub fn build(state: Arc<RwLock<AgentState>>) -> Result<Self> {
-        let docker = Docker::connect_with_local_defaults()?;  
+    pub fn build(state: Arc<RwLock<AgentState>>) -> Self {
+        Self {
+            state,
+            docker: OnceLock::new(),
+        }
+    }
 
-        Ok(
-            Self {
-                state,
-                docker,
-            }
-        )
+    fn docker(&self) -> Result<&Docker> {
+        if self.docker.get().is_none() {
+            let docker = Docker::connect_with_local_defaults()?;
+            let _ = self.docker.set(docker);
+        }
+
+        Ok(self.docker.get().expect("Docker client was initialized"))
     }
 
     pub async fn execute_workload(&self, workload: Workload) -> Result<()> {
@@ -130,7 +135,7 @@ impl RuntimeManager {
         };
 
         let container = self
-            .docker
+            .docker()?
             .create_container(Some(options), config)
             .await?;
 
@@ -139,7 +144,7 @@ impl RuntimeManager {
 
     pub async fn docker_start_container(&self, container_id: &str) -> Result<()> {
         self
-            .docker
+            .docker()?
             .start_container(container_id, None)
             .await?;
 
@@ -152,7 +157,7 @@ impl RuntimeManager {
              .build();
 
         let result = self
-            .docker
+            .docker()?
             .inspect_container(container_id, Some(options))
             .await?;
 
@@ -179,7 +184,7 @@ impl RuntimeManager {
             .build();
 
         self
-            .docker
+            .docker()?
             .remove_container(container_id, Some(options))
             .await?;
 

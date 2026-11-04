@@ -24,6 +24,11 @@ use shared::models::{
     WorkloadToDelete,
 };
 
+enum WorkloadStateSource {
+    Resolved(ExecutionState),
+    Docker(String),
+}
+
 pub async fn execute_workload(
     State(state): State<AppState>,
     Json(workload): Json<Workload>,
@@ -276,7 +281,20 @@ fn aggregate_process_states(states: &[ExecutionState]) -> ExecutionState {
     ExecutionState::Unknown
 }
 
-enum WorkloadStateSource {
-    Resolved(ExecutionState),
-    Docker(String),
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use shared::models::ExecutionState;
+
+    #[test]
+    fn aggregate_all_running_processes() {
+        let states = vec! [
+            ExecutionState::Running,
+            ExecutionState::Running
+        ];
+
+        let aggregate_state = aggregate_process_states(&states);
+        assert_eq!(aggregate_state, ExecutionState::Running);
+    }
 }

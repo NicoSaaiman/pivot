@@ -121,7 +121,7 @@ pub struct ManagedNode {
     pub last_seen: Instant,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 pub enum ExecutionState {
     Running,
     Stopped,

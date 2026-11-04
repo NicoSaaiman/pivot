@@ -42,8 +42,13 @@ pub enum AgentError {
 
 impl IntoResponse for AgentError {
     fn into_response(self) -> Response {
+        let status = match &self {
+            AgentError::WorkloadNotFound(_) => StatusCode::NOT_FOUND,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+
         let message = self.to_string();
 
-        (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
+        (status, message).into_response()
     }
 }

@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let shared_state = AppState { 
         agent: agent.clone(),
-        runtime: Arc::new(RuntimeManager::build(agent)?),
+        runtime: Arc::new(RuntimeManager::build(agent)),
     };
 
     let client = {
