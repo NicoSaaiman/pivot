@@ -20,5 +20,6 @@ void ffi_print_process_details(const CProcess *process);
 pid_t ffi_create_process(const CProcess *process);
 ProcessState ffi_get_process_state(pid_t pid);
 int ffi_terminate_process(pid_t pid);
+int ffi_wait_process_blocking(pid_t pid);
 
 #endif

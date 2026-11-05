@@ -12,4 +12,6 @@ pub enum RuntimeError {
     ProcessStateFailed,
     #[error("Failed to terminate process")]
     TerminationFailed,
+    #[error("Wait operation failed")]
+    WaitFailed,
 }

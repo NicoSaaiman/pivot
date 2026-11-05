@@ -100,6 +100,7 @@ unsafe extern "C" {
     fn ffi_create_process(process: *const CProcess) -> c_int;
     fn ffi_get_process_state(pid: c_int) -> c_int;
     fn ffi_terminate_process(pid: c_int) -> c_int;
+    fn ffi_wait_process_blocking(pid: c_int) -> c_int;
 }
 
 pub fn print_process_details(process: &Process) -> Result<()> {
@@ -153,4 +154,16 @@ pub fn terminate_process(pid: c_int) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn wait_process_blocking(pid: c_int) -> Result<()> {
+    let result = unsafe {
+        ffi_wait_process_blocking(pid)
+    };
+
+    if result == -1 {
+        return Err(RuntimeError::WaitFailed);
+    }
+
+    Ok(()) 
 }

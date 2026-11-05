@@ -200,5 +200,9 @@ impl RuntimeManager {
         ffi::terminate_process(pid)?;
         Ok(())
     }
-
+    
+    pub fn custom_wait_process_blocking(&self, pid: c_int) -> Result<()> {
+        ffi::wait_process_blocking(pid)?;
+        Ok(())
+    }
 }

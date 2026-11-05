@@ -89,3 +89,14 @@ int monitor_processes(int num_to_create, int created_total, pid_t *child_pids) {
 
 	return failed;
 }
+
+int wait_process_blocking(pid_t pid) {
+	int status;
+	pid_t result;
+
+	do {
+		result = waitpid(pid, &status, 0);
+	} while (result == -1 && errno == EINTR);
+
+	return result == -1 ? -1 : 0;
+}

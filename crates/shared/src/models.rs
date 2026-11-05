@@ -19,6 +19,20 @@ pub struct Workload {
 }
 
 impl Workload {
+    pub fn new(
+        id: WorkloadId, 
+        group_id: GroupId, 
+        desired_state: ExecutionState, 
+        execution_type: ExecutionType
+    ) -> Self {
+        Self {
+            id,
+            group_id,
+            desired_state,
+            execution_type,
+        }
+    }
+
     pub fn get_workload_id(&self) -> WorkloadId {
         self.id.clone()
     }
@@ -32,7 +46,7 @@ impl Workload {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct WorkloadStatus {
     pub state: ExecutionState,
     pub last_updated: SystemTime,
@@ -159,6 +173,20 @@ pub struct Process {
 }
 
 impl Process {
+    pub fn new(
+        command: String, 
+        args: Vec<String>, 
+        env: BTreeMap<String, String>, 
+        working_directory: Option<String>
+    ) -> Self {
+        Self {
+            command,
+            args,
+            env,
+            working_directory,
+        }
+    }
+
     pub fn get_command(&self) -> &str {
         &self.command
     }

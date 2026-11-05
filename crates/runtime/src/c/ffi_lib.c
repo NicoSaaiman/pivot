@@ -38,3 +38,7 @@ ProcessState ffi_get_process_state(pid_t pid) {
 int ffi_terminate_process(pid_t pid) {
 	return terminate_process(pid);
 }
+
+int ffi_wait_process_blocking(pid_t pid) {
+	return wait_process_blocking(pid);
+}
