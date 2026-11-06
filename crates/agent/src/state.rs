@@ -26,6 +26,7 @@ impl AgentState {
         Self {
             controller_client: HttpControllerClient {
                 client: reqwest::Client::new(),
+                controller_url: "http://localhost:3000".to_string(),
             },
             workloads: HashMap::new(),
         }

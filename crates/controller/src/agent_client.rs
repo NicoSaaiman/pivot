@@ -33,7 +33,8 @@ impl AgentClient for HttpAgentClient {
             .client
             .delete(&url)
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
 
         Ok(())
     }

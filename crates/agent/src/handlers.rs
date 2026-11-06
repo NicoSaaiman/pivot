@@ -219,6 +219,7 @@ pub async fn delete_workload(
             };
 
             child.kill()?;
+            child.wait()?;
 
             agent_state.workloads.remove(&workload_id);
 

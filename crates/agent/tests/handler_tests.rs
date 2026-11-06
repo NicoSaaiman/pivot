@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::process;
 use std::sync::{Arc, RwLock};
 
@@ -17,6 +17,7 @@ use shared::models::{
     NodeMetrics,
     Process,
     Workload,
+    WorkloadId,
     WorkloadStatus,
 };
 
@@ -70,6 +71,97 @@ async fn get_node_metrics() {
     assert!(metrics.load_average.min_5.is_finite());
     assert!(metrics.load_average.min_15.is_finite());
 }
+
+//---------execute_workload()-----------
+#[tokio::test]
+async fn execute_missing_body_no_content_type() {
+    let (_, app) = setup_test_router(AgentState::new());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("POST")
+            .uri("/execute")
+            .body(Body::empty())
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+}
+
+#[tokio::test]
+async fn execute_missing_body() {
+    let (_, app) = setup_test_router(AgentState::new());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("POST")
+            .uri("/execute")
+            .header("Content-Type", "application/json")
+            .body(Body::empty())
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);  
+}
+
+#[tokio::test]
+async fn execute_invalid_json() {
+    let (_, app) = setup_test_router(AgentState::new());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("POST")
+            .uri("/execute")
+            .header("Content-Type", "application/json")
+            .body(Body::from("{ invalid json }"))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST); 
+}
+
+#[tokio::test]
+async fn execute_empty_custom_container() {
+    let workload = Workload::new(
+        "test-workload".to_string(),
+        "test-group".to_string(),
+        ExecutionState::Running,
+        ExecutionType::CustomContainer(CustomContainer {
+            processes: vec![], 
+        }),
+    );
+
+    let (state, app) = setup_test_router(AgentState::new());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("POST")
+            .uri("/execute")
+            .header("Content-Type", "application/json")
+            .body(Body::from(serde_json::to_vec(&workload).unwrap()))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    let agent_state = state.agent.read().unwrap();
+    assert!(agent_state.workloads.is_empty());
+}
+
+
+//---------get_workload()----------
 
 #[tokio::test]
 async fn get_workload_returns_not_found_for_unknown_id() {
@@ -253,6 +345,147 @@ async fn custom_container_single_get_workload_running() {
         state.runtime.custom_wait_process_blocking(pid).unwrap();
     }
 }
+
+//------get_workloads()-------
+
+#[tokio::test]
+async fn get_workloads_none() {
+    let (_, app) = setup_test_router(AgentState::new());
+    
+    let response = app
+        .oneshot(
+            Request::builder()
+            .uri("/workloads")
+            .body(Body::empty())
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+
+    let workloads: HashMap<WorkloadId, ExecutionState> = serde_json::from_slice(&body).unwrap();
+
+    assert!(workloads.is_empty());
+}
+
+#[tokio::test]
+async fn get_workloads_populated() {
+    let mut agent_state = AgentState::new();
+    
+    let child = process::Command::new("sleep")
+        .arg("30")
+        .spawn()
+        .unwrap();
+
+    agent_state.workloads.insert(
+        "test-workload".to_string(),
+        RuntimeHandle::Process(child),
+    );
+
+    let (state, app) = setup_test_router(agent_state);
+    
+    let response = app
+        .oneshot(
+            Request::builder()
+            .uri("/workloads")
+            .body(Body::empty())
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+
+    let workloads: HashMap<WorkloadId, ExecutionState> = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(workloads.len(), 1);
+    assert!(workloads.contains_key("test-workload"));
+    assert_eq!(workloads.get("test-workload").unwrap(), &ExecutionState::Running);
+
+    {
+        let mut agent_state = state.agent.write().unwrap();
+
+        if let Some(RuntimeHandle::Process(child)) =
+            agent_state.workloads.get_mut("test-workload")
+        {
+            child.kill().unwrap();
+            child.wait().unwrap();
+        }
+    }  
+
+}
+
+//----------delete_workload()-----------
+
+#[tokio::test]
+async fn delete_workload_returns_not_found_for_unknown_id() {
+    let (_, app) = setup_test_router(AgentState::new());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("DELETE")
+            .uri("/workload/nonexistent-workload")
+            .body(Body::empty())
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn delete_workload_found() {
+    let mut agent_state = AgentState::new();
+    
+    let child = process::Command::new("sleep")
+        .arg("30")
+        .spawn()
+        .unwrap();
+
+    let pid = child.id();
+
+    agent_state.workloads.insert(
+        "test-workload".to_string(),
+        RuntimeHandle::Process(child),
+    );
+
+    let (state, app) = setup_test_router(agent_state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("DELETE")
+            .uri("/workload/test-workload")
+            .body(Body::empty())
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    {
+        let agent_state = state.agent.read().unwrap();
+        assert!(agent_state.workloads.is_empty());  
+    }
+    
+    assert!(
+        unsafe { libc::kill(pid as libc::pid_t, 0) } == -1 &&
+        std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+    );
+}
+
 
 //--------Helper Functions----------
 

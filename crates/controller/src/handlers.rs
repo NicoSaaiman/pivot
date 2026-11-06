@@ -71,6 +71,14 @@ pub async fn delete_workload(
     client
         .delete_workload(&node.get_address(), workload_id.clone())
         .await?;
+
+    {
+        let mut state = state
+            .write()
+            .map_err(|_| ControllerError::PoisonError)?;
+
+        state.desired_workloads.remove(&workload_id);
+    }
    
     tracing::info!("Workload deleted: {workload_id} -> {}", node.id);
 

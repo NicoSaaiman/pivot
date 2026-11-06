@@ -14,6 +14,7 @@ pub trait ControllerClient {
 #[derive(Clone)]
 pub struct HttpControllerClient {
     pub client: reqwest::Client,
+    pub controller_url: String,
 }
 
 impl ControllerClient for HttpControllerClient {
@@ -31,10 +32,11 @@ impl ControllerClient for HttpControllerClient {
         };
 
         self.client
-            .post("http://localhost:3000/nodes") // temp hardcode
+            .post(format!("{}/nodes", self.controller_url))
             .json(&node)
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
 
         Ok(())
     }

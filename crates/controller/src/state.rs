@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use shared::models::{ExecutionState, ManagedNode, Node, NodeId, Workload, WorkloadId};
 
@@ -120,9 +120,9 @@ impl WorkloadStatus {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct WorkloadDetails {
-    id: WorkloadId,
+    pub id: WorkloadId,
     desired_state: ExecutionState,
     actual_state: ExecutionState,
     node: Option<NodeId>,
