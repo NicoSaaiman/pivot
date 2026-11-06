@@ -18,4 +18,5 @@ tokio = { version = "1.53", features = ["full"] }
 tower = "0.5"
 
 [dev-dependencies]
+test-utils = { path = "../test-utils" }
 wiremock = "0.6"

@@ -1,16 +1,11 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
-use wiremock::{
-    ResponseTemplate, 
-    matchers::{method, path},
-    Mock, 
-    MockServer,
-};
+use wiremock::ResponseTemplate;
 
 use pivot_controller::{
     routes,
@@ -25,79 +20,23 @@ use pivot_controller::{
 
 use shared::models::{
     ExecutionState,
-    ExecutionType,
     Node,
     NodeId,
-    NodeInfo,
-    NodeMetrics,
-    MemoryUsage,
-    LoadAverage,
-    Process,
-    Workload,
 };
+
+use test_utils;
 
 //---------execute_workload()----------
 
 #[tokio::test]
 async fn execute_workload_success() {
-    let mock_server = MockServer::start().await;
-
-    Mock::given(method("POST"))
-        .and(path("/execute"))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .mount(&mock_server)
-        .await;
+    let mock_server = test_utils::get_mock_server("POST", "/execute", ResponseTemplate::new(200)).await;
 
     let mut controller_state = ControllerState::new();
 
-    let info = NodeInfo {
-        address: mock_server.uri(),
-        hostname: "beep_boop".to_string(),
-        machine_id: "12345".to_string(),
-        node_id: "node1".to_string(),
-        port: "3000".to_string(),
-    };
-
-    let memory_usage = MemoryUsage {
-        used_kb: 0.0,
-        total_kb: 0.0,
-    };
-
-    let load_average = LoadAverage {
-        min_1: 0.0,
-        min_5: 0.0,
-        min_15: 0.0,
-    };
-
-    let metrics = NodeMetrics {
-        cpu_usage: 0.0,
-        memory_usage,
-        load_average,
-        uptime: 0.0,
-    };
-
-    let node = Node {
-        id: "node1".to_string(),
-        info,
-        metrics,
-        is_online: true,
-    };
+    let node = test_utils::create_test_node("node1".to_string(), Some(mock_server.uri()));
+    let workload = test_utils::create_test_workload();
     controller_state.update_nodes(node);
-
-    let process = Process::new(
-        "sleep".to_string(),
-        vec!["30".to_string()],
-        BTreeMap::new(),
-        None,
-    );
-
-    let workload = Workload::new(
-        "test-workload".to_string(), 
-        "default".to_string(), 
-        ExecutionState::Running, 
-        ExecutionType::Process(process)
-    );
 
     let state = Arc::new(RwLock::new(controller_state));
     let app = routes::create_router(Arc::clone(&state));
@@ -143,56 +82,11 @@ async fn execute_workload_success() {
 async fn get_workload_success() {
     let mut controller_state = ControllerState::new();
 
-    let info = NodeInfo {
-        address: "http://localhost".to_string(),
-        hostname: "beep_boop".to_string(),
-        machine_id: "12345".to_string(),
-        node_id: "node1".to_string(),
-        port: "3000".to_string(),
-    };
-
-    let memory_usage = MemoryUsage {
-        used_kb: 0.0,
-        total_kb: 0.0,
-    };
-
-    let load_average = LoadAverage {
-        min_1: 0.0,
-        min_5: 0.0,
-        min_15: 0.0,
-    };
-
-    let metrics = NodeMetrics {
-        cpu_usage: 0.0,
-        memory_usage,
-        load_average,
-        uptime: 0.0,
-    };
-
-    let node = Node {
-        id: "node1".to_string(),
-        info,
-        metrics,
-        is_online: true,
-    };
-    controller_state.update_nodes(node);
-
-    let process = Process::new(
-        "sleep".to_string(),
-        vec!["30".to_string()],
-        BTreeMap::new(),
-        None,
-    );
-
-    let workload = Workload::new(
-        "test-workload".to_string(), 
-        "default".to_string(), 
-        ExecutionState::Running, 
-        ExecutionType::Process(process)
-    );
-
+    let node = test_utils::create_test_node("node1".to_string(), None);
+    let workload = test_utils::create_test_workload();
     let workload_id = workload.get_workload_id();
-
+    controller_state.update_nodes(node);
+    
     let scheduled_workload = ScheduledWorkload {
         workload,
         assigned_node: Some("node1".to_string()),
@@ -239,66 +133,14 @@ async fn get_workload_success() {
 
 #[tokio::test]
 async fn delete_workload_success() {
-    let mock_server = MockServer::start().await;
-
-    Mock::given(method("DELETE"))
-        .and(path("/workload/test-workload"))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .mount(&mock_server)
-        .await;
+    let mock_server = test_utils::get_mock_server("DELETE", "/workload/test-workload", ResponseTemplate::new(200)).await;
 
     let mut controller_state = ControllerState::new();
 
-    let info = NodeInfo {
-        address: mock_server.uri(),
-        hostname: "beep_boop".to_string(),
-        machine_id: "12345".to_string(),
-        node_id: "node1".to_string(),
-        port: "3000".to_string(),
-    };
-
-    let memory_usage = MemoryUsage {
-        used_kb: 0.0,
-        total_kb: 0.0,
-    };
-
-    let load_average = LoadAverage {
-        min_1: 0.0,
-        min_5: 0.0,
-        min_15: 0.0,
-    };
-
-    let metrics = NodeMetrics {
-        cpu_usage: 0.0,
-        memory_usage,
-        load_average,
-        uptime: 0.0,
-    };
-
-    let node = Node {
-        id: "node1".to_string(),
-        info,
-        metrics,
-        is_online: true,
-    };
-    controller_state.update_nodes(node);
-
-    let process = Process::new(
-        "sleep".to_string(),
-        vec!["30".to_string()],
-        BTreeMap::new(),
-        None,
-    );
-
-    let workload = Workload::new(
-        "test-workload".to_string(), 
-        "default".to_string(), 
-        ExecutionState::Running, 
-        ExecutionType::Process(process)
-    );
-
+    let node = test_utils::create_test_node("node1".to_string(), Some(mock_server.uri()));
+    let workload = test_utils::create_test_workload();
     let workload_id = workload.get_workload_id();
+    controller_state.update_nodes(node);
 
     let scheduled_workload = ScheduledWorkload {
         workload,
@@ -343,38 +185,7 @@ async fn delete_workload_success() {
 async fn update_nodes_success() {
     let controller_state = ControllerState::new();
 
-    let info = NodeInfo {
-        address: "localhost".to_string(),
-        hostname: "beep_boop".to_string(),
-        machine_id: "12345".to_string(),
-        node_id: "node1".to_string(),
-        port: "3000".to_string(),
-    };
-
-    let memory_usage = MemoryUsage {
-        used_kb: 0.0,
-        total_kb: 0.0,
-    };
-
-    let load_average = LoadAverage {
-        min_1: 0.0,
-        min_5: 0.0,
-        min_15: 0.0,
-    };
-
-    let metrics = NodeMetrics {
-        cpu_usage: 0.0,
-        memory_usage,
-        load_average,
-        uptime: 0.0,
-    };
-
-    let node = Node {
-        id: "node1".to_string(),
-        info,
-        metrics,
-        is_online: true,
-    };
+    let node = test_utils::create_test_node("node1".to_string(), None);
 
     let state = Arc::new(RwLock::new(controller_state));
     let app = routes::create_router(state);
@@ -436,39 +247,9 @@ async fn get_nodes_empty() {
 async fn get_nodes_success() {
     let mut controller_state = ControllerState::new();
 
-    let info = NodeInfo {
-        address: "localhost".to_string(),
-        hostname: "beep_boop".to_string(),
-        machine_id: "12345".to_string(),
-        node_id: "node1".to_string(),
-        port: "3000".to_string(),
-    };
-
-    let memory_usage = MemoryUsage {
-        used_kb: 0.0,
-        total_kb: 0.0,
-    };
-
-    let load_average = LoadAverage {
-        min_1: 0.0,
-        min_5: 0.0,
-        min_15: 0.0,
-    };
-
-    let metrics = NodeMetrics {
-        cpu_usage: 0.0,
-        memory_usage,
-        load_average,
-        uptime: 0.0,
-    };
-
-    let node = Node {
-        id: "node1".to_string(),
-        info,
-        metrics,
-        is_online: true,
-    };
+    let node = test_utils::create_test_node("node1".to_string(), None);
     controller_state.update_nodes(node);
+
     let state = Arc::new(RwLock::new(controller_state));
     let app = routes::create_router(state);
     

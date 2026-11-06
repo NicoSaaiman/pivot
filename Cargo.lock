@@ -1020,6 +1020,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "test-utils",
  "thiserror",
  "tokio",
  "tower",
@@ -1035,6 +1036,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
+ "test-utils",
  "thiserror",
  "tokio",
  "tower",
@@ -1641,6 +1643,14 @@ checksum = "8e1d1b10ced5ca923a1fcb8d03e96b8d3268065d724548c0211415ff6ac6bac4"
 dependencies = [
  "core-foundation-sys",
  "libc",
+]
+
+[[package]]
+name = "test-utils"
+version = "0.1.0"
+dependencies = [
+ "shared",
+ "wiremock",
 ]
 
 [[package]]

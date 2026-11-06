@@ -8,16 +8,11 @@ use pivot_agent::controller_client::{
     HttpControllerClient
 };
 
+use test_utils;
+
 #[tokio::test]
 async fn register_node_success() {
-    let mock_server = MockServer::start().await;
-
-    Mock::given(method("POST"))
-        .and(path("/nodes"))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .mount(&mock_server)
-        .await;
+    let mock_server = test_utils::get_mock_server("POST", "/nodes", ResponseTemplate::new(200)).await;
 
     let controller_client = HttpControllerClient {
         client: reqwest::Client::new(),
