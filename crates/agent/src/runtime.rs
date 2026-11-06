@@ -35,7 +35,7 @@ impl RuntimeManager {
         }
     }
 
-    fn docker(&self) -> Result<&Docker> {
+    pub fn docker(&self) -> Result<&Docker> {
         if self.docker.get().is_none() {
             let docker = Docker::connect_with_local_defaults()?;
             let _ = self.docker.set(docker);

@@ -298,4 +298,37 @@ mod tests {
         let aggregate_state = aggregate_process_states(&states);
         assert_eq!(aggregate_state, ExecutionState::Running);
     }
+
+    #[test]
+    fn aggregate_contains_exited_process() {
+        let states = vec! [
+            ExecutionState::Running,
+            ExecutionState::Exited
+        ];
+
+        let aggregate_state = aggregate_process_states(&states);
+        assert_eq!(aggregate_state, ExecutionState::Exited);
+    }
+
+    #[test]
+    fn aggregate_contains_unknown_process() {
+        let states = vec! [
+            ExecutionState::Running,
+            ExecutionState::Unknown
+        ];
+
+        let aggregate_state = aggregate_process_states(&states);
+        assert_eq!(aggregate_state, ExecutionState::Unknown);
+    }
+
+    #[test]
+    fn aggregate_all_stopped_processes() {
+        let states = vec! [
+            ExecutionState::Stopped,
+            ExecutionState::Stopped
+        ];
+
+        let aggregate_state = aggregate_process_states(&states);
+        assert_eq!(aggregate_state, ExecutionState::Stopped);
+    }
 }

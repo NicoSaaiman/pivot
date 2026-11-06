@@ -36,4 +36,19 @@ mod tests {
 
         assert_eq!(result, vec!["".to_string()]);
     }
+
+    #[test]
+    fn convert_kb_to_gb_success() {
+        let result = convert_kb_to_gb(1000000.0);
+
+        assert_eq!(result, 1.0);
+    }
+
+    #[test]
+    fn convert_sec_to_min_and_sec_success() {
+        let (min, sec) = convert_sec_to_min_and_sec(65.0);
+
+        assert_eq!(min, 1);
+        assert_eq!(sec, 5);
+    }
 }

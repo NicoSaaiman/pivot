@@ -36,7 +36,7 @@ impl AgentState {
         &self.controller_client
     }
 
-    pub fn add_workload(mut self, workload_id: WorkloadId, runtime_handle: RuntimeHandle) {
+    pub fn add_workload(&mut self, workload_id: WorkloadId, runtime_handle: RuntimeHandle) {
         self.workloads.insert(workload_id, runtime_handle);
     }
 }
@@ -54,4 +54,30 @@ pub enum RuntimeHandle {
 pub struct CustomProcessHandle {
     pub pid: c_int,
     pub cached_state: ExecutionState,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_http_controller_client_success() {
+        let state = AgentState::new();
+
+        let client = state.get_http_controller_client();
+
+        assert_eq!(client.controller_url, "http://localhost:3000");
+    }
+
+    #[test]
+    fn add_workload_success() {
+        let mut state = AgentState::new();
+
+        let workload_id = "test-workload".to_string();
+        let runtime_handle = RuntimeHandle::Custom { processes: vec![], };
+
+        state.add_workload(workload_id.clone(), runtime_handle);
+
+        assert!(state.workloads.contains_key(&workload_id));
+    }
 }

@@ -27,3 +27,24 @@ impl IntoResponse for ControllerError {
         (StatusCode::INTERNAL_SERVER_ERROR, message).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+
+    #[tokio::test]
+    async fn controller_error_into_response() {
+        let error = ControllerError::NoAvailableNodes;
+
+        let response = error.into_response();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+
+        assert_eq!(String::from_utf8(body.to_vec()).unwrap(), "No available nodes found");
+    }
+}

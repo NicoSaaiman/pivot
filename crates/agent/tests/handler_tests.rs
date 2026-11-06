@@ -6,11 +6,13 @@ use axum::body::{Body, to_bytes};
 use axum::response::IntoResponse;
 use axum::http::{Request, StatusCode};
 use axum::routing::Router;
+use bollard::query_parameters::InspectContainerOptionsBuilder;
 use serde_json;
 use tower::ServiceExt;
 
 use shared::models::{
     CustomContainer,
+    DockerContainer,
     ExecutionState,
     ExecutionType,
     NodeInfo, 
@@ -73,6 +75,7 @@ async fn get_node_metrics() {
 }
 
 //---------execute_workload()-----------
+
 #[tokio::test]
 async fn execute_missing_body_no_content_type() {
     let (_, app) = setup_test_router(AgentState::new());
@@ -160,6 +163,71 @@ async fn execute_empty_custom_container() {
     assert!(agent_state.workloads.is_empty());
 }
 
+#[tokio::test]
+async fn execute_workload_docker_success() {
+    let docker_container = DockerContainer {
+        name: "pivot-test-execute-running".to_string(),
+        image: Some("busybox:latest".to_string()),
+        cmd: Some(vec!["sleep".to_string(), "30".to_string()]),
+    };
+
+    let workload = Workload::new(
+        "test-workload".to_string(),
+        "test-group".to_string(),
+        ExecutionState::Running,
+        ExecutionType::DockerContainer(docker_container),
+    );
+
+    let (state, app) = setup_test_router(AgentState::new());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("POST")
+            .uri("/execute")
+            .header("Content-Type", "application/json")
+            .body(Body::from(serde_json::to_vec(&workload).unwrap()))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let container_id = {
+        let agent_state = state.agent.read().unwrap();
+        
+        let runtime_handle = agent_state
+            .workloads
+            .get("test-workload")
+            .unwrap();
+
+        match runtime_handle {
+            RuntimeHandle::Docker { container_id } => container_id.clone(),
+            _ => panic!("Expected Docker runtime handle"),
+        }
+    };
+
+    let result = state
+        .runtime
+        .docker()
+        .unwrap()
+        .inspect_container(&container_id, None)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.state.unwrap().status,
+        Some(bollard::models::ContainerStateStatusEnum::RUNNING)
+    );
+
+    state
+        .runtime
+        .docker_delete_container(&container_id)
+        .await
+        .unwrap();
+}
+
 
 //---------get_workload()----------
 
@@ -235,7 +303,7 @@ async fn docker_get_workload_running() {
     let container_id = state
         .runtime
         .docker_create_container(
-            "pivot-test-running",
+            "pivot-test-get-running",
             Some("busybox:latest".to_string()),
             Some(vec!["sleep".to_string(), "30".to_string()]),
         )
@@ -445,7 +513,7 @@ async fn delete_workload_returns_not_found_for_unknown_id() {
 }
 
 #[tokio::test]
-async fn delete_workload_found() {
+async fn delete_workload_found_process() {
     let mut agent_state = AgentState::new();
     
     let child = process::Command::new("sleep")
@@ -486,6 +554,72 @@ async fn delete_workload_found() {
     );
 }
 
+#[tokio::test]
+async fn delete_workload_found_docker() {
+    let (state, app) = setup_test_router(AgentState::new());
+
+    let container_id = state
+        .runtime
+        .docker_create_container(
+            "pivot-test-delete-running",
+            Some("busybox:latest".to_string()),
+            Some(vec!["sleep".to_string(), "30".to_string()]),
+        )
+        .await
+        .unwrap();
+
+    state
+        .runtime
+        .docker_start_container(&container_id)
+        .await
+        .unwrap();
+    
+    state
+        .agent
+        .write()
+        .unwrap()
+        .workloads
+        .insert(
+            "test-workload".to_string(),
+            RuntimeHandle::Docker { 
+                container_id: container_id.clone(),
+            },
+        );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("DELETE")
+            .uri("/workload/test-workload")
+            .body(Body::empty())
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    
+    let result = state
+        .runtime
+        .docker()
+        .unwrap()
+        .inspect_container(
+            &container_id,
+            Some(
+                InspectContainerOptionsBuilder::default()
+                    .size(false)
+                    .build(),
+            ),
+        )
+        .await;
+
+    assert!(result.is_err());
+
+    {
+        let agent_state = state.agent.read().unwrap();
+        assert!(agent_state.workloads.is_empty());  
+    }
+}
 
 //--------Helper Functions----------
 
