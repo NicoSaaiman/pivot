@@ -96,22 +96,10 @@ struct CProcess {
 }
 
 unsafe extern "C" {
-    fn ffi_print_process_details(process: *const CProcess);
     fn ffi_create_process(process: *const CProcess) -> c_int;
     fn ffi_get_process_state(pid: c_int) -> c_int;
     fn ffi_terminate_process(pid: c_int) -> c_int;
     fn ffi_wait_process_blocking(pid: c_int) -> c_int;
-}
-
-pub fn print_process_details(process: &Process) -> Result<()> {
-    let owned = OwnedCProcess::convert(process)?;
-    let ffi_process = owned.as_ffi();
-
-    unsafe {
-        ffi_print_process_details(&ffi_process);
-    }
-
-    Ok(())
 }
 
 pub fn create_process(process: &Process) -> Result<c_int> {
@@ -166,4 +154,160 @@ pub fn wait_process_blocking(pid: c_int) -> Result<()> {
     }
 
     Ok(()) 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn owned_c_process_convert_success() {
+        let mut env = BTreeMap::new();
+        env.insert("APP_ENV".to_string(), "test".to_string());
+        env.insert("LOG_LEVEL".to_string(), "debug".to_string());
+
+        let process = Process::new(
+            "/usr/bin/my-app".to_string(),
+            vec!["--verbose".to_string(), "--port".to_string(), "8080".to_string()],
+            env,
+            Some("/tmp".to_string()),
+        );
+
+        let owned = OwnedCProcess::convert(&process).unwrap();
+
+        assert_eq!(owned.command.to_str().unwrap(), "/usr/bin/my-app");
+        assert_eq!(owned.args.len(), 3);
+        assert_eq!(owned.args[0].to_str().unwrap(), "--verbose");
+        assert_eq!(owned.args[1].to_str().unwrap(), "--port");
+        assert_eq!(owned.args[2].to_str().unwrap(), "8080");
+
+        assert_eq!(owned.env_keys.len(), 2);
+        assert_eq!(owned.env_values.len(), 2);
+        assert_eq!(owned.working_dir.as_ref().unwrap().to_str().unwrap(), "/tmp");
+    }
+
+    #[test]
+    fn owned_c_process_convert_invalid_command() {
+        let process = Process::new(
+            "invalid\0command".to_string(),
+            vec![],
+            BTreeMap::new(),
+            None,
+        );
+
+        let result = OwnedCProcess::convert(&process);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn owned_c_process_convert_invalid_argument() {
+        let process = Process::new(
+            "/usr/bin/my-app".to_string(),
+            vec!["valid".to_string(), "invalid\0argument".to_string()],
+            BTreeMap::new(),
+            None,
+        );
+
+        let result = OwnedCProcess::convert(&process);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn owned_c_process_convert_invalid_env_key() {
+        let mut env = BTreeMap::new();
+        env.insert("INVALID\0KEY".to_string(), "value".to_string());
+
+        let process = Process::new(
+            "/usr/bin/my-app".to_string(),
+            vec![],
+            env,
+            None,
+        );
+
+        let result = OwnedCProcess::convert(&process);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn owned_c_process_convert_invalid_env_value() {
+        let mut env = BTreeMap::new();
+        env.insert("VALID_KEY".to_string(), "INVALID\0VALUE".to_string());
+
+        let process = Process::new(
+            "/usr/bin/my-app".to_string(),
+            vec![],
+            env,
+            None,
+        );
+
+        let result = OwnedCProcess::convert(&process);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn owned_c_process_convert_invalid_working_dir() {
+        let process = Process::new(
+            "/usr/bin/my-app".to_string(),
+            vec![],
+            BTreeMap::new(),
+            Some("invalid\0directory".to_string()),
+        );
+
+        let result = OwnedCProcess::convert(&process);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn owned_c_process_convert_minimal_process() {
+        let process = Process::new(
+            "/usr/bin/my-app".to_string(),
+            vec![],
+            BTreeMap::new(),
+            None,
+        );
+
+        let owned = OwnedCProcess::convert(&process).unwrap();
+        let ffi_process = owned.as_ffi();
+        
+        assert_eq!(ffi_process.argc, 0);
+        assert_eq!(ffi_process.env_count, 0);
+        assert!(ffi_process.working_dir.is_null());
+    }
+
+    #[test]
+    fn get_process_state_invalid_pid() {
+        let result = get_process_state(-1);
+
+        assert!(matches!(
+            result,
+            Err(RuntimeError::ProcessStateFailed)
+        ));
+    }
+
+    #[test]
+    fn terminate_process_invalid_pid() {
+        let result = terminate_process(i32::MAX);
+
+        assert!(matches!(
+            result,
+            Err(RuntimeError::TerminationFailed)
+        ));
+    }
+
+    #[test]
+    fn wait_process_blocking_invalid_pid() {
+        let result = wait_process_blocking(i32::MAX);
+
+        assert!(matches!(
+            result,
+            Err(RuntimeError::WaitFailed)
+        ));
+    }
 }
