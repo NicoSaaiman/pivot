@@ -89,21 +89,6 @@ pub struct NodeInfo {
     pub port: String,
 }
 
-impl NodeInfo {
-    pub fn collect() -> Self {
-        let node_id = std::env::args().nth(1).unwrap_or("default".to_string());
-        let port = std::env::args().nth(2).unwrap_or("3000".to_string());
-
-        Self {
-            address: "".to_string(),
-            hostname: "".to_string(),
-            machine_id: "".to_string(),
-            node_id,
-            port,
-        }
-    }
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct NodeMetrics {
     pub cpu_usage: f64,

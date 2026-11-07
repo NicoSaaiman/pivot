@@ -37,15 +37,16 @@ fn get_raw_load_average() -> Result<String> {
 // total = busy + idle
 fn get_cpu_usage() -> Result<CpuUsage> {
     let raw_cpu = get_raw_cpu_info()?;
-    let cpu_info_vec = util::convert_to_vec(raw_cpu, '\n');
-    let cpu_summary = cpu_info_vec
-        .get(0)
+    parse_cpu_usage(&raw_cpu)
+}
+
+fn parse_cpu_usage(raw_cpu: &str) -> Result<CpuUsage> {
+    let cpu_summary = raw_cpu
+        .lines()
+        .next()
         .ok_or(AgentError::MissingCpuField)?;
-    let cpu_summary_vec = util::convert_to_vec(
-        cpu_summary
-        .clone()
-        .replace("  ", " "), ' '
-    );
+
+    let cpu_summary_vec: Vec<&str> = cpu_summary.split_whitespace().collect();
 
     let idle: f64 = cpu_summary_vec
         .get(4)
@@ -98,7 +99,7 @@ fn get_cpu_usage() -> Result<CpuUsage> {
 
     Ok(
         CpuUsage { busy, total }
-    )
+    )   
 }
 
 // usage = busy_delta / total_delta × 100
@@ -198,4 +199,28 @@ pub fn get_load_average() -> Result<LoadAverage> {
             min_15,
         }
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_cpu_usage_success() {
+        let raw_cpu = "cpu 100 20 30 400 50 10 5 2 3 4 1\n";
+
+        let result = parse_cpu_usage(raw_cpu).unwrap();
+
+        assert_eq!(result.busy, 167.0);
+        assert_eq!(result.total, 617.0);
+    }
+
+    #[test]
+    fn parse_cpu_missing_fields() {
+        let raw_cpu = "cpu 100 20 30 400 50";
+
+        let result = parse_cpu_usage(raw_cpu);
+
+        assert!(matches!(result, Err(AgentError::MissingCpuField)));
+    }
 }

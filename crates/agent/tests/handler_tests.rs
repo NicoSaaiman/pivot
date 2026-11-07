@@ -25,7 +25,7 @@ use shared::models::{
 
 use pivot_agent::{
     handlers,
-    state::{AppState, AgentState, RuntimeHandle},
+    state::{AppState, AgentState, CustomProcessHandle, RuntimeHandle},
     routes,
     runtime::RuntimeManager,
 };
@@ -228,6 +228,65 @@ async fn execute_workload_docker_success() {
         .unwrap();
 }
 
+#[tokio::test]
+async fn execute_workload_process_success() {
+    let process = Process::new(
+        "sleep".to_string(),
+        vec!["30".to_string()],
+        BTreeMap::new(),
+        None,
+    );
+
+    let workload = Workload::new(
+        "test-workload".to_string(),
+        "default".to_string(),
+        ExecutionState::Running,
+        ExecutionType::Process(process)
+    );
+
+    let (state, app) = setup_test_router(AgentState::new());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+            .method("POST")
+            .uri("/execute")
+            .header("Content-Type", "application/json")
+            .body(Body::from(serde_json::to_vec(&workload).unwrap()))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let mut child = {
+        let mut agent_state = state.agent.write().unwrap();
+
+        let handle = agent_state
+            .workloads
+            .get_mut("test-workload")
+            .expect("Expected workload to be inserted");
+
+        match handle {
+            RuntimeHandle::Process(child) => {
+                assert!(
+                    child.try_wait().unwrap().is_none(),
+                    "Expected process to still be running"
+                );
+            }
+            _ => panic!("Expected RuntimeHandle::Process"),
+        }
+
+        match agent_state.workloads.remove("test-workload").unwrap() {
+            RuntimeHandle::Process(child) => child,
+            _ => unreachable!(),
+        }
+    };
+
+    child.kill().unwrap();
+    child.wait().unwrap();
+}
 
 //---------get_workload()----------
 
@@ -357,7 +416,7 @@ async fn docker_get_workload_running() {
 
 #[tokio::test]
 async fn custom_container_single_get_workload_running() {
-     let (state, app) = setup_test_router(AgentState::new());
+    let (state, app) = setup_test_router(AgentState::new());
 
     let process = Process::new(
         "sleep".to_string(),
@@ -443,20 +502,67 @@ async fn get_workloads_none() {
 
 #[tokio::test]
 async fn get_workloads_populated() {
-    let mut agent_state = AgentState::new();
+    let (state, app) = setup_test_router(AgentState::new());
     
+    //------Process------
     let child = process::Command::new("sleep")
         .arg("30")
         .spawn()
         .unwrap();
+    
+    //-------Docker---------
+    let container_id = state
+        .runtime
+        .docker_create_container(
+            "pivot-test-get-many-running",
+            Some("busybox:latest".to_string()),
+            Some(vec!["sleep".to_string(), "30".to_string()]),
+        )
+        .await
+        .unwrap();
 
-    agent_state.workloads.insert(
-        "test-workload".to_string(),
-        RuntimeHandle::Process(child),
+    state
+        .runtime
+        .docker_start_container(&container_id)
+        .await
+        .unwrap();
+
+    //------Custom Container-------
+    let process = Process::new(
+        "sleep".to_string(),
+        vec!["30".to_string()],
+        BTreeMap::new(),
+        None,
     );
 
-    let (state, app) = setup_test_router(agent_state);
-    
+    let pid = state.runtime.custom_create_process(&process).unwrap();
+
+    let custom_process = CustomProcessHandle {
+        pid,
+        cached_state: ExecutionState::Running,
+    };
+
+    {
+        let mut agent_state = state.agent.write().unwrap();
+
+        agent_state.workloads.insert(
+            "test-workload-process".to_string(),
+            RuntimeHandle::Process(child),
+        );
+
+        agent_state.workloads.insert(
+                "test-workload-docker".to_string(),
+                RuntimeHandle::Docker { 
+                    container_id: container_id.clone(),
+                },
+        );
+
+        agent_state.workloads.insert(
+            "test-workload-custom".to_string(),
+            RuntimeHandle::Custom { processes: vec![custom_process] },
+        );
+    }
+
     let response = app
         .oneshot(
             Request::builder()
@@ -475,21 +581,45 @@ async fn get_workloads_populated() {
 
     let workloads: HashMap<WorkloadId, ExecutionState> = serde_json::from_slice(&body).unwrap();
 
-    assert_eq!(workloads.len(), 1);
-    assert!(workloads.contains_key("test-workload"));
-    assert_eq!(workloads.get("test-workload").unwrap(), &ExecutionState::Running);
+    assert_eq!(workloads.len(), 3);
 
-    {
+    for workload_id in [
+        "test-workload-process",
+        "test-workload-docker",
+        "test-workload-custom"
+    ] {
+        assert_eq!(
+            workloads.get(workload_id),
+            Some(&ExecutionState::Running),
+            "Expected {workload_id} to be running"
+        );
+    }
+
+    let (process_handle, docker_handle, custom_handle) = {
         let mut agent_state = state.agent.write().unwrap();
 
-        if let Some(RuntimeHandle::Process(child)) =
-            agent_state.workloads.get_mut("test-workload")
-        {
-            child.kill().unwrap();
-            child.wait().unwrap();
-        }
-    }  
+        (
+            agent_state.workloads.remove("test-workload-process").unwrap(),
+            agent_state.workloads.remove("test-workload-docker").unwrap(),
+            agent_state.workloads.remove("test-workload-custom").unwrap(),
+        )
+    };
 
+    if let RuntimeHandle::Process(mut child) = process_handle {
+        child.kill().unwrap();
+        child.wait().unwrap();
+    }
+
+    if let RuntimeHandle::Docker { container_id } = docker_handle {
+        state.runtime.docker_delete_container(&container_id).await.unwrap();
+    }
+
+    if let RuntimeHandle::Custom { processes } = custom_handle {
+        for process in processes {
+            state.runtime.custom_terminate_process(process.pid).unwrap();
+            state.runtime.custom_wait_process_blocking(process.pid).unwrap();
+        }
+    }
 }
 
 //----------delete_workload()-----------

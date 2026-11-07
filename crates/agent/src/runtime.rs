@@ -14,6 +14,7 @@ use runtime::ffi;
 use shared::models::{
     ExecutionState,
     ExecutionType,
+    Process,
     Workload,
 };
 
@@ -204,5 +205,10 @@ impl RuntimeManager {
     pub fn custom_wait_process_blocking(&self, pid: c_int) -> Result<()> {
         ffi::wait_process_blocking(pid)?;
         Ok(())
+    }
+
+    pub fn custom_create_process(&self, process: &Process) -> Result<c_int> {
+        let pid = ffi::create_process(process)?;
+        Ok(pid)
     }
 }
